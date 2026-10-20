@@ -1,12 +1,8 @@
 import org.gradle.internal.os.OperatingSystem
 import java.util.Properties
 
-// Every language module openevv has. US English is named first because the
-// engine gives that one to a caller who asks for no language in particular,
-// and the settings screen's preview is such a caller.
-val ALL_LANGUAGES = listOf(
-	"enus", "engb", "eses", "esus", "frfr", "frca", "dede", "itit", "plpl", "jajp"
-)
+// Only US English is included in this build. Other language modules are deliberately excluded.
+val ALL_LANGUAGES = listOf("enus")
 
 plugins {
 	alias(libs.plugins.android.application)
@@ -14,11 +10,11 @@ plugins {
 	alias(libs.plugins.kotlin.compose)
 }
 
-val abis = (findProperty("evvdroid.abis") as String? ?: "arm64-v8a,armeabi-v7a,x86_64")
+val abis = (findProperty("evvdroid.abis") as String? ?: "arm64-v8a")
 	.split(",").map { it.trim() }.filter { it.isNotEmpty() }
 val rulesForm = findProperty("evvdroid.rules") as String? ?: "c"
 val languages = findProperty("evvdroid.langs") as String?
-	?: ALL_LANGUAGES.joinToString(" ") { "lang/$it" }
+	?: "lang/enus"
 val nativeOut = layout.buildDirectory.dir("native/jniLibs")
 
 // Release signing, from a keystore.properties the repo does not carry. Without
@@ -35,14 +31,6 @@ val buildNative by tasks.registering(Exec::class) {
 	description = "Cross-compiles the openevv engine and the JNI bridge for each ABI."
 	val engine = rootProject.layout.projectDirectory.dir("native/openevv")
 	val script = rootProject.layout.projectDirectory.file("native/build-native.sh")
-	// Deliberately not the engine's own sources. The script patches them, so a
-	// task declaring them would be rewriting its own inputs every time it ran
-	// and would never settle: the first build after any change fails and the
-	// next one succeeds. What decides the output is the submodule's commit, the
-	// patches laid on it, and the files named here. Editing native/openevv by
-	// hand wants --rerun-tasks. The patches are a file tree rather than a
-	// directory so that the build still works if they are ever all upstreamed
-	// and the directory goes, since git does not carry an empty one.
 	inputs.files(rootProject.fileTree("native/patches"))
 	inputs.file(rootProject.layout.projectDirectory.file("native/android.mk"))
 	inputs.file(rootProject.layout.projectDirectory.file(".gitmodules"))
@@ -115,8 +103,6 @@ android {
 				storePassword = props.getProperty("storePassword")
 				keyAlias = props.getProperty("keyAlias")
 				keyPassword = props.getProperty("keyPassword")
-				// Off by default in AGP. It is what lets the key be rotated
-				// later without every install having to be thrown away.
 				enableV3Signing = true
 			}
 		}
@@ -136,18 +122,16 @@ android {
 
 	packaging {
 		jniLibs {
-			// A screen reader cannot wait for a library to be unpacked, and an
-			// uncompressed one is mapped straight out of the APK.
 			useLegacyPackaging = false
 		}
 	}
 
 	splits {
 		abi {
-			isEnable = (findProperty("evvdroid.abiSplits") as String?)?.toBoolean() ?: true
+			isEnable = (findProperty("evvdroid.abiSplits") as String?)?.toBoolean() ?: false
 			reset()
 			include(*abis.toTypedArray())
-			isUniversalApk = true
+			isUniversalApk = false
 		}
 	}
 
