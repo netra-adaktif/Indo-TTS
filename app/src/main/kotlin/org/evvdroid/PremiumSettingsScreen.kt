@@ -46,7 +46,7 @@ fun PremiumSettingsScreen(state: SettingsModel) {
                 title = { Text("Pengaturan TTS") },
                 actions = {
                     TextButton(onClick = { state.say() }) {
-                        Text("Preview")
+                        Text("Pratinjau")
                     }
                 }
             )
@@ -105,7 +105,7 @@ fun PremiumSettingsScreen(state: SettingsModel) {
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Bahasa preview")
+                            Text("Bahasa pratinjau")
                             Button(onClick = { languageMenuExpanded = true }) {
                                 Text(state.languageNames.getOrNull(state.language) ?: "English")
                             }
@@ -167,7 +167,7 @@ fun PremiumSettingsScreen(state: SettingsModel) {
                         onValueChange = { state.setPercent(Eci.VOICE_SPEED, it) }
                     )
                     SettingsSliderRow(
-                        title = "Pitch",
+                        title = "Nada",
                         value = state.percentOf(Eci.VOICE_PITCH),
                         onValueChange = { state.setPercent(Eci.VOICE_PITCH, it) }
                     )
@@ -368,9 +368,9 @@ fun PremiumSettingsScreen(state: SettingsModel) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Sample rate")
+                        Text("Kecepatan sampel")
                         Text("${state.sampleRateHz} Hz")
-                    )
+                    }
 
                     Slider(
                         value = state.sampleRateHz.toFloat(),
@@ -454,7 +454,7 @@ fun PremiumSettingsScreen(state: SettingsModel) {
                             onClick = { state.resetVoice() },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Reset default")
+                            Text("Reset bawaan")
                         }
                     }
                 }
