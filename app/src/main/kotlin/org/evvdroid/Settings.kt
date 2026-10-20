@@ -224,7 +224,7 @@ class Settings(context: Context) {
 		const val KEY_READ_PUNCTUATION = "read_punctuation"
 		const val KEY_PUNCTUATION_LEVEL = "punctuation_level"
 		const val KEY_READ_EMOJI = "read_emoji"
-		const val DEFAULT_SAMPLE_RATE = 11025
+		const val DEFAULT_SAMPLE_RATE = 16000
 
 		/** Where the copy taken of a picked dictionary is recorded. DirectBoot
 		 *  rewrites these when it moves the files, so it needs the name too. */
