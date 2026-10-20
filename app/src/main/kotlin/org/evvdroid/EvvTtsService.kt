@@ -48,13 +48,19 @@ class EvvTtsService : TextToSpeechService() {
 
 	// ---- languages -------------------------------------------------------
 
+	private fun isUsEnglishLanguage(language: Int): Boolean {
+		val loc = Eci.localeOf(language) ?: return false
+		return loc.first.equals("eng", ignoreCase = true) && loc.second.equals("USA", ignoreCase = true)
+	}
+
 	override fun onIsLanguageAvailable(lang: String?, country: String?, variant: String?): Int {
 		val found = Languages.match(lang, country) ?: return TextToSpeech.LANG_NOT_SUPPORTED
-		return found.second
+		return if (isUsEnglishLanguage(found.first)) found.second else TextToSpeech.LANG_NOT_SUPPORTED
 	}
 
 	override fun onLoadLanguage(lang: String?, country: String?, variant: String?): Int {
 		val found = Languages.match(lang, country) ?: return TextToSpeech.LANG_NOT_SUPPORTED
+		if (!isUsEnglishLanguage(found.first)) return TextToSpeech.LANG_NOT_SUPPORTED
 		ensureEngine(found.first) ?: return TextToSpeech.LANG_NOT_SUPPORTED
 		return found.second
 	}
@@ -75,20 +81,18 @@ class EvvTtsService : TextToSpeechService() {
 	override fun onGetVoices(): MutableList<Voice> {
 		val out = ArrayList<Voice>()
 		for (language in EvvEngine.available) {
-			val loc = Eci.localeOf(language) ?: continue
-			val locale = Locale(loc.first, loc.second)
-			for (preset in Eci.PRESET_NAMES.indices) {
-				out.add(
-					Voice(
-						voiceName(language, preset),
-						locale,
-						Voice.QUALITY_NORMAL,
-						Voice.LATENCY_VERY_LOW,
-						false,
-						emptySet()
-					)
+			if (!isUsEnglishLanguage(language)) continue
+			val locale = Locale("en", "US")
+			out.add(
+				Voice(
+					voiceName(language, 0),
+					locale,
+					Voice.QUALITY_NORMAL,
+					Voice.LATENCY_VERY_LOW,
+					false,
+					emptySet()
 				)
-			}
+			)
 		}
 		return out
 	}
@@ -96,9 +100,7 @@ class EvvTtsService : TextToSpeechService() {
 	private fun findVoice(name: String?): Pair<Int, Int>? {
 		if (name.isNullOrEmpty()) return null
 		for (language in EvvEngine.available) {
-			for (preset in Eci.PRESET_NAMES.indices) {
-				if (voiceName(language, preset) == name) return language to preset
-			}
+			if (isUsEnglishLanguage(language) && voiceName(language, 0) == name) return language to 0
 		}
 		return null
 	}
@@ -114,7 +116,7 @@ class EvvTtsService : TextToSpeechService() {
 
 	override fun onGetDefaultVoiceNameFor(lang: String?, country: String?, variant: String?): String? {
 		val found = Languages.match(lang, country) ?: return null
-		return voiceName(found.first, settings?.voice ?: 0)
+		return if (isUsEnglishLanguage(found.first)) voiceName(found.first, 0) else null
 	}
 
 	// ---- speaking --------------------------------------------------------
@@ -137,10 +139,7 @@ class EvvTtsService : TextToSpeechService() {
 		target.setSampleRate(s.sampleRateHz)
 		target.setAbbreviations(s.abbreviations)
 		loadDictionaries(target, s)
-		// A voice is written, so the engine can refuse it while it is speaking.
-		// One that did not land is left unrecorded and asked for again at the
-		// next utterance rather than believed.
-		if (target.applyVoice(s.voice, s.shape(s.voice))) appliedRevision = s.revision
+		if (target.applyVoice(0, s.shape(0))) appliedRevision = s.revision
 	}
 
 	/** Teaching words happens when the files change rather than whenever any setting does. */
@@ -191,15 +190,10 @@ class EvvTtsService : TextToSpeechService() {
 		if (request == null || callback == null) return
 		stopped = false
 		val found = Languages.match(request.language, request.country)
-		if (found == null) {
+		if (found == null || !isUsEnglishLanguage(found.first)) {
 			callback.error(TextToSpeech.ERROR_NOT_INSTALLED_YET)
 			return
 		}
-		// The voice is whichever the settings screen says, not whichever the
-		// caller named. A caller holds on to the Voice it was given, so a
-		// screen reader that connected while Reed was chosen goes on asking
-		// for Reed however many times the setting is changed underneath it.
-		// The name still decides the language, since that is what it is for.
 		val wanted = findVoice(request.voiceName)
 		val language = wanted?.first ?: found.first
 		val target = ensureEngine(language)
@@ -215,8 +209,6 @@ class EvvTtsService : TextToSpeechService() {
 				loadDictionaries(target, s)
 			}
 		}
-		// Re-sent every time rather than once, because it is the one setting
-		// with no way of telling whether something else has moved it.
 		s?.let { target.setAbbreviations(it.abbreviations) }
 		target.setRatePercent(request.speechRate)
 		target.setPitchPercent(request.pitch)
@@ -251,9 +243,6 @@ class EvvTtsService : TextToSpeechService() {
 				readRomanNumerals = s.readRomanNumerals
 			)
 		}
-		// Run at every level, even none: marks a screen reader has already
-		// named are flagged so they are not named twice, and only this takes
-		// the flag back out.
 		val punctLevel = if (s?.readPunctuation != false) {
 			s?.punctuationLevel ?: Punctuation.LEVEL_SOME
 		} else {
@@ -266,21 +255,8 @@ class EvvTtsService : TextToSpeechService() {
 			callback.done()
 			return
 		}
-		// The framework is not told an utterance has begun until there are
-		// samples for it. Saying so up front and then being silenced before the
-		// engine has made anything hands the reader a whole start and finish
-		// with no speech in it, and TalkBack reads that as its queue running
-		// dry: it answers "Completed speech while already completed", stops the
-		// queue, and the item the finger is actually on dies with it. That is
-		// what made dragging across a launcher go quiet. RHVoice opens the same
-		// way, from inside its player rather than ahead of it.
 		val opening = Opening(callback, target.sampleRateHz)
 		val pace = Pace(target.sampleRateHz * BYTES_PER_SAMPLE)
-		// Piece by piece, so that asking for silence waits out a piece rather
-		// than the whole message: the engine cannot abandon what it is saying.
-		// Pauses are shortened after the split rather than before it: the
-		// annotation sits in front of the full stop, and a piece boundary is
-		// found by looking at the end of a word.
 		val pauses = settings?.pauses ?: Pauses.ALL
 		val prosody = Prosody.prefix(settings?.phrasePrediction ?: false)
 		val pieces = TextPieces.split(text)
@@ -292,9 +268,6 @@ class EvvTtsService : TextToSpeechService() {
 				callback.error(TextToSpeech.ERROR_SYNTHESIS)
 				return
 			}
-			// stop may have arrived while speak waited for the previous worker.
-			// speak resets native cancellation when starting the new piece;
-			// abort it again rather than leave an undrained worker behind.
 			if (stopped) {
 				target.stop()
 				break
@@ -308,8 +281,6 @@ class EvvTtsService : TextToSpeechService() {
 		if (opening.began) callback.done()
 	}
 
-	/** Hands one piece's samples on as they arrive, and answers whether the
-	 *  caller may go on to the next. */
 	private fun pump(target: EvvEngine, callback: SynthesisCallback, pace: Pace, opening: Opening): Boolean {
 		val size = callback.maxBufferSize.coerceIn(MIN_CHUNK, MAX_CHUNK)
 		val buffer = ByteArray(size)
@@ -321,8 +292,6 @@ class EvvTtsService : TextToSpeechService() {
 				return false
 			}
 			if (callback.audioAvailable(buffer, 0, n) != TextToSpeech.SUCCESS) {
-				// The framework has torn the callback down already, so done()
-				// is neither wanted nor listened to.
 				target.stop()
 				return false
 			}
@@ -336,21 +305,6 @@ class EvvTtsService : TextToSpeechService() {
 		if (pace.handedMs() > mostAudioHandedMs) mostAudioHandedMs = pace.handedMs()
 	}
 
-	/**
-	 * Waits until the audio already handed over has nearly caught up.
-	 *
-	 * This engine is far faster than the speech it makes -- a second and a
-	 * third of audio comes out in twelve milliseconds -- and Android takes
-	 * every byte of it without complaint and queues it. So a reader swiping
-	 * quickly has five or six items synthesised and queued while the first is
-	 * still being spoken, and when it then asks for silence the whole queue
-	 * goes, which is items that were never heard at all. Running no further
-	 * ahead than [LEAD_MS] keeps at most one utterance in flight, so silence
-	 * arrives where the reader actually is.
-	 *
-	 * The wait is in slices so that a stop is noticed at once rather than at
-	 * the end of it.
-	 */
 	private fun hold(pace: Pace) {
 		while (!stopped) {
 			val ahead = pace.ahead() - LEAD_MS
@@ -364,9 +318,6 @@ class EvvTtsService : TextToSpeechService() {
 		}
 	}
 
-	/** Tells the framework an utterance has begun, once, and not before there
-	 *  is something to hear. [began] answers whether it was ever told, which is
-	 *  what decides whether it is owed a finish. */
 	private class Opening(private val callback: SynthesisCallback, private val rateHz: Int) {
 		var began = false
 			private set
@@ -378,8 +329,6 @@ class EvvTtsService : TextToSpeechService() {
 		}
 	}
 
-	/** How far the audio handed over has run ahead of the time it takes to
-	 *  play it. */
 	private class Pace(private val bytesPerSecond: Int) {
 		private val from = System.nanoTime()
 		private var bytes = 0L
@@ -394,12 +343,6 @@ class EvvTtsService : TextToSpeechService() {
 	}
 
 	internal companion object {
-		/** The most audio, in milliseconds, that any one utterance has handed
-		 *  over since this was last cleared. Nothing in the app reads it. It is
-		 *  what lets a test say the engine is not running ahead of the speech,
-		 *  which is invisible from outside: an engine that queues six items in
-		 *  a tenth of a second and one that paces itself look the same to the
-		 *  framework and sound completely different to a person. */
 		@Volatile
 		var mostAudioHandedMs: Long = 0
 
@@ -407,8 +350,6 @@ class EvvTtsService : TextToSpeechService() {
 		const val MIN_CHUNK = 1024
 		const val MAX_CHUNK = 8192
 		const val BYTES_PER_SAMPLE = 2
-		/** How much audio may sit ahead of the speech, so that the track never
-		 *  runs dry while the engine is held back. */
 		const val LEAD_MS = 300L
 		const val SLICE_MS = 50L
 	}
