@@ -1,5 +1,9 @@
 package org.evvdroid
 
+import org.evvdroid.Numbers.MODE_DEFAULT
+import org.evvdroid.Numbers.MODE_DIGITS
+import org.evvdroid.Numbers.MODE_WORDS
+
 import android.content.Context
 import android.content.SharedPreferences
 
