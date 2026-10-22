@@ -82,6 +82,10 @@ class EvvEngine private constructor(private var handle: Long, val language: Int)
 		sampleRateHz = Eci.sampleRateHz(index)
 	}
 
+    fun setWideband(on: Boolean) = synchronized(guard) {
+        if (!closed) EvvNative.setParam(handle, Eci.PARAM_WIDEBAND, if (on) 1 else 0)
+    }
+
 	fun setAnnotations(on: Boolean) = synchronized(guard) {
 		if (!closed) EvvNative.setParam(handle, Eci.PARAM_INPUT_TYPE, if (on) 1 else 0)
 	}

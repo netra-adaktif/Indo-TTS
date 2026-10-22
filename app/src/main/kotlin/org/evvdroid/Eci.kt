@@ -9,6 +9,7 @@ object Eci {
 	const val PARAM_TEXT_MODE = 2
 	const val PARAM_DICTIONARY = 3
 	const val PARAM_SAMPLE_RATE = 5
+    const val PARAM_WIDEBAND = 32
 	const val PARAM_REAL_WORLD_UNITS = 8
 	const val PARAM_LANGUAGE_DIALECT = 9
 	const val PARAM_NUMBER_MODE = 10
