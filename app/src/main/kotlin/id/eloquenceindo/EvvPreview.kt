@@ -103,7 +103,7 @@ class EvvPreview(private var language: Int) {
 			if (mine != generation) return@post
 			val e = engine ?: EvvEngine.open(language)?.also { engine = it } ?: return@post
 			e.setSampleRate(rateHz)
-			e.setWideband(false)
+			e.setWideband(true)
 			e.applyVoice(voice, shape)
 			if (!e.speak(text)) {
 				Log.e(TAG, "the engine refused the sample")

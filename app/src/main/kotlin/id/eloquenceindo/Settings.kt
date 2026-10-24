@@ -231,7 +231,7 @@ class Settings(context: Context) {
 		const val KEY_PUNCTUATION_LEVEL = "punctuation_level"
 		const val KEY_READ_EMOJI = "read_emoji"
 		const val KEY_AUDIO_PROFILE = "audio_profile"
-		const val DEFAULT_SAMPLE_RATE = 16000
+		const val DEFAULT_SAMPLE_RATE = 22050
 		const val DEFAULT_AUDIO_PROFILE = 0
 
 		/** Where the copy taken of a picked dictionary is recorded. DirectBoot
