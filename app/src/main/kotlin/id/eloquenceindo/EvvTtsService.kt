@@ -230,6 +230,9 @@ class EvvTtsService : TextToSpeechService() {
 		if (s?.readEmoji != false) {
 			processedText = Emoji.apply(processedText)
 		}
+		if (Languages.isIndonesian(request.language)) {
+			processedText = Indonesian.numbers(processedText)
+		}
 		if (s?.processNumbers == true) {
 			processedText = Numbers.apply(
 				processedText,

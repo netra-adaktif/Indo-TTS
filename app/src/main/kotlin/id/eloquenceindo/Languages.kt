@@ -13,6 +13,13 @@ import java.util.Locale
  */
 object Languages {
 
+	/** Whether [lang], as Android names it, is Indonesian. */
+	fun isIndonesian(lang: String?): Boolean {
+		if (lang.isNullOrEmpty()) return false
+		val code = lang.lowercase()
+		return code == "ind" || code == "id" || code == "in"
+	}
+
 	/**
 	 * The engine language for [lang] and [country], and how good the match is
 	 * in Android's own terms.
