@@ -15,12 +15,14 @@ import kotlin.math.tanh
  *
  * Three profiles, the way the settings screen offers them:
  *
- * - Balanced: the lowest rumble is cut, the range where consonants live is
- *   lifted a little, and the whole is made somewhat louder.
+ * - Balanced: only the lowest rumble (under about 70 Hz) is cut, the range
+ *   where consonants live is lifted a little, and the whole is made somewhat
+ *   louder. A man's voice such as Reed's sits at about 100 to 130 Hz, so the
+ *   cut stays below it.
  * - Quality: nothing is touched. What the engine made is what is heard.
  * - Volume: a phone speaker cannot play the bass anyway, and the energy spent
- *   on it is what makes loud speech break up, so more of it is cut, the
- *   consonants are lifted more, and the gain is greater.
+ *   on it is what makes loud speech break up, so more of it is cut (under
+ *   about 130 Hz), the consonants are lifted more, and the gain is greater.
  *
  * Whatever the gain, a limiter holds the peaks down and a soft clip after it
  * keeps anything that got past from ever reaching full scale, so louder does
@@ -49,7 +51,7 @@ class AudioShaper(profile: Int, rateHz: Int) {
 			}
 			PROFILE_VOLUME -> {
 				stages = listOf(
-					Biquad.highPass(240.0, 0.7071, rateHz),
+					Biquad.highPass(130.0, 0.7071, rateHz),
 					Biquad.peaking(3000.0, 5.0, 0.8, rateHz)
 				)
 				gain = 3.2
@@ -57,7 +59,7 @@ class AudioShaper(profile: Int, rateHz: Int) {
 			}
 			else -> {
 				stages = listOf(
-					Biquad.highPass(110.0, 0.7071, rateHz),
+					Biquad.highPass(70.0, 0.7071, rateHz),
 					Biquad.peaking(2800.0, 2.5, 0.9, rateHz)
 				)
 				gain = 1.6

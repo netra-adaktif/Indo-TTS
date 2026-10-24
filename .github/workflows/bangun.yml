@@ -1,6 +1,8 @@
 name: Bangun APK
 
-# Berjalan setiap kali ada dorongan (push) ke cabang "bangun".
+# Berjalan hanya kalau pesan commit memuat kata [bangun], supaya dorongan biasa
+# tidak memakai menit Actions. Contoh:
+#   git commit --allow-empty -m "Bangun APK [bangun]" && git push
 on:
   push:
     branches: [bangun]
@@ -11,6 +13,7 @@ permissions:
 
 jobs:
   apk:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[bangun]')
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -31,6 +34,19 @@ jobs:
           "$SDKM" "ndk;27.0.12077973" "platforms;android-36" > /dev/null
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
 
+      - name: Pasang kunci tanda tangan tetap
+        shell: bash
+        env:
+          KUNCI: ${{ secrets.DEBUG_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KUNCI" ]; then
+            mkdir -p "$HOME/.android"
+            echo "$KUNCI" | base64 -d > "$HOME/.android/debug.keystore"
+            echo "Memakai kunci tanda tangan tetap."
+          else
+            echo "Rahasia DEBUG_KEYSTORE_B64 belum ada: memakai kunci sementara."
+          fi
+
       - name: Bangun
         shell: bash
         run: |
@@ -41,6 +57,13 @@ jobs:
             -Pevvdroid.langs=lang/enus \
             -Pevvdroid.abiSplits=false \
             --no-daemon 2>&1 | tee build.txt
+
+      - name: Sidik jari tanda tangan
+        if: success()
+        shell: bash
+        run: |
+          AS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
+          "$AS" verify --print-certs app/build/outputs/apk/debug/app-debug.apk | grep -i "SHA-256"
 
       - name: Simpan APK
         if: success()
