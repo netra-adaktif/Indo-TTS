@@ -1,0 +1,60 @@
+name: Bangun APK
+
+# Berjalan setiap kali ada dorongan (push) ke cabang "bangun".
+on:
+  push:
+    branches: [bangun]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Pasang NDK dan platform Android
+        shell: bash
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "ndk;27.0.12077973" "platforms;android-36" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
+
+      - name: Bangun
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug \
+            -Pevvdroid.abis=arm64-v8a \
+            -Pevvdroid.rules=bytecode \
+            -Pevvdroid.langs=lang/enus \
+            -Pevvdroid.abiSplits=false \
+            --no-daemon 2>&1 | tee build.txt
+
+      - name: Simpan APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Eloquence-Indo
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Simpan catatan build
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: catatan-build
+          path: build.txt
+          retention-days: 1
