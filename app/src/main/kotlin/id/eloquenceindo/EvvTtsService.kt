@@ -138,7 +138,7 @@ class EvvTtsService : TextToSpeechService() {
 	private fun applySettings(target: EvvEngine) {
 		val s = settings ?: return
 		target.setSampleRate(s.sampleRateHz)
-		target.setWideband(true)
+		target.setWideband(false)
 		target.setAbbreviations(s.abbreviations)
 		loadDictionaries(target, s)
 		if (target.applyVoice(0, s.shape(0))) appliedRevision = s.revision
